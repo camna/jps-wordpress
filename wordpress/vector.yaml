@@ -1,0 +1,39 @@
+data_dir: /var/lib/vector
+
+sources:
+  system_logs:
+    type: file
+    include:
+      - /var/log/**/*.log
+    exclude:
+      - /var/log/nginx/*.log
+    read_from: end
+    ignore_older_secs: 600
+    file_key: source
+
+  nginx_logs:
+    type: file
+    include:
+      - /var/log/nginx/*.log
+    read_from: end
+    ignore_older_secs: 600
+    file_key: source
+
+  wp_debug:
+    type: file
+    include:
+      - /var/www/webroot/ROOT/wp-content/debug.log
+    read_from: end
+    ignore_older_secs: 600
+    file_key: source
+
+sinks:
+  axiom:
+    type: axiom
+    inputs:
+      - system_logs
+      - nginx_logs
+      - wp_debug
+    compression: zstd
+    dataset: "${AXIOM_DATASET}"
+    token: "${AXIOM_TOKEN}"
