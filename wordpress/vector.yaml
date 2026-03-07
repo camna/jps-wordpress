@@ -1,39 +1,218 @@
-data_dir: /var/lib/vector
+#                                    __   __  __
+#                                    \ \ / / / /
+#                                     \ V / / /
+#                                      \_/  \/
+#
+#                                    V E C T O R
+#                                   Configuration
+#
+# ------------------------------------------------------------------------------
+# Website: https://vector.dev
+# Docs: https://vector.dev/docs
+# Chat: https://chat.vector.dev
+# ------------------------------------------------------------------------------
 
+# Change this to use a non-default directory for Vector data storage:
+# data_dir: "/var/lib/vector"
+
+# Random Syslog-formatted logs
+#sources:
+#  dummy_logs:
+#    type: "demo_logs"
+#    format: "syslog"
+#    interval: 1
+
+# Parse Syslog logs
+# See the Vector Remap Language reference for more info: https://vrl.dev
+#transforms:
+#  parse_logs:
+#    type: "remap"
+#    inputs: ["dummy_logs"]
+#    source: |
+#      . = parse_syslog!(string!(.message))
+
+# Print parsed logs to stdout
+#sinks:
+#  print:
+#    type: "console"
+#    inputs: ["parse_logs"]
+#    encoding:
+#      codec: "json"
+#      json:
+#        pretty: true
+
+# Vector's GraphQL API (disabled by default)
+# Uncomment to try it out with the `vector top` command or
+# in your browser at http://localhost:8686
+# api:
+#   enabled: true
+#   address: "127.0.0.1:8686"
+
+# =====================  SOURCES  =====================
+# VAP / Jelastic LEMP/LLSMP • AlmaLinux 9 • Webroot: /var/www/webroot/ROOT (single site)
 sources:
-  system_logs:
+  # NGINX (when present on LEMP)
+  nginx_access_logs:
+    type: file
+    include: [/var/log/nginx/*access*log, /var/log/nginx/access.log]
+    read_from: beginning
+    ignore_older_secs: 600
+
+  nginx_error_logs:
+    type: file
+    include: [/var/log/nginx/*error*log, /var/log/nginx/error.log]
+    read_from: beginning
+    ignore_older_secs: 600
+
+  # LiteSpeed (LLSMP)
+  litespeed_access_logs:
     type: file
     include:
-      - /var/log/**/*.log
-    exclude:
-      - /var/log/nginx/*.log
-    read_from: end
+      - /var/log/litespeed/access.log
+      - /var/log/litespeed/admin/access.log
+    read_from: beginning
     ignore_older_secs: 600
-    file_key: source
 
-  nginx_logs:
+  litespeed_error_logs:
     type: file
     include:
-      - /var/log/nginx/*.log
-    read_from: end
+      - /var/log/litespeed/error.log
+      - /var/log/litespeed/admin/error.log
+    read_from: beginning
     ignore_older_secs: 600
-    file_key: source
 
-  wp_debug:
+  litespeed_php_errors:
+    type: file
+    include: [/var/log/litespeed/php_errors.log]
+    read_from: beginning
+    ignore_older_secs: 600
+
+  litespeed_other_logs:
     type: file
     include:
-      - /var/www/webroot/ROOT/wp-content/debug.log
-    read_from: end
+      - /var/log/litespeed/lsrestart.log
+      - /var/log/litespeed/stderr.log
+      - /var/log/litespeed/admin/lsrestart.log
+      - /var/log/litespeed/admin/stderr.log
+    read_from: beginning
     ignore_older_secs: 600
-    file_key: source
 
+  # System logs (AlmaLinux: not all names end in .log, e.g. /var/log/messages)
+  syslog:
+    type: file
+    include:
+      - /var/log/messages
+      - /var/log/secure
+      - /var/log/maillog
+      - /var/log/cron
+      - /var/log/boot.log
+      - /var/log/*log
+    read_from: beginning
+    ignore_older_secs: 600
+
+  # WordPress debug (single site under webroot)
+  wp_debug_logs:
+    type: file
+    include: [/var/www/webroot/ROOT/wp-content/debug.log]
+    read_from: beginning
+    ignore_older_secs: 600
+
+  # WooCommerce logs (under webroot)
+  wc_logs:
+    type: file
+    include: [/var/www/webroot/ROOT/wp-content/uploads/wc-logs/*.log]
+    read_from: beginning
+    ignore_older_secs: 600
+
+  # Slow logs (add paths when known: e.g. MySQL slow query log, PHP-FPM slow log)
+  slow_logs:
+    type: file
+    include:
+      - /var/log/mysql/*slow*
+      - /var/log/*slow*
+    read_from: beginning
+    ignore_older_secs: 600
+
+  host_metrics:
+    type: host_metrics
+    scrape_interval_secs: 60
+
+# =====================  TRANSFORMS  =====================
+transforms:
+  # Tag each source with source_name = <component id>
+  tag_nginx_access:      {type: remap, inputs: [nginx_access_logs],     source: '.source_name = "nginx_access_logs"'}
+  tag_nginx_error:       {type: remap, inputs: [nginx_error_logs],      source: '.source_name = "nginx_error_logs"'}
+  tag_litespeed_access:  {type: remap, inputs: [litespeed_access_logs], source: '.source_name = "litespeed_access_logs"'}
+  tag_litespeed_error:   {type: remap, inputs: [litespeed_error_logs],  source: '.source_name = "litespeed_error_logs"'}
+  tag_litespeed_php:     {type: remap, inputs: [litespeed_php_errors],  source: '.source_name = "litespeed_php_errors"'}
+  tag_litespeed_other:   {type: remap, inputs: [litespeed_other_logs],  source: '.source_name = "litespeed_other_logs"'}
+  tag_syslog:            {type: remap, inputs: [syslog],                source: '.source_name = "syslog"'}
+  tag_wp_debug:          {type: remap, inputs: [wp_debug_logs],         source: '.source_name = "wp_debug_logs"'}
+  tag_wc_logs:           {type: remap, inputs: [wc_logs],              source: '.source_name = "wc_logs"'}
+  tag_slow_logs:         {type: remap, inputs: [slow_logs],            source: '.source_name = "slow_logs"'}
+  tag_host_metrics:      {type: remap, inputs: [host_metrics],         source: '.source_name = "host_metrics"'}
+
+  # Parse nginx access logs (combined / VAP-style)
+  parse_nginx_access_logs:
+    type: remap
+    inputs: [tag_nginx_access]
+    source: |
+      # Combined format: IP - - [date] "request" status size "referer" "user_agent"
+      parsed = parse_regex!(.message, r'^(?P<remote_addr>\S+) \S+ \S+ \[(?P<time_local>[^\]]+)\] "(?P<request>[^"]+)" (?P<status>\d{3}) (?P<body_bytes_sent>\S+) "(?P<http_referer>[^"]*)" "(?P<http_user_agent>[^"]*)"')
+      if !is_null(parsed) && !is_null(parsed.status) {
+        . = merge(., parsed)
+        .status = to_int!(.status)
+        if parsed.body_bytes_sent == "-" {
+          .body_bytes_sent = null
+        } else {
+          .body_bytes_sent = to_int(parsed.body_bytes_sent) ?? null
+        }
+      }
+
+  # Parse LiteSpeed access logs: IP - - [date] "request" status size "referer" "user_agent"
+  parse_litespeed_access_logs:
+    type: remap
+    inputs: [tag_litespeed_access]
+    source: |
+      parsed = parse_regex!(.message, r'^(?P<remote_addr>\S+) \S+ \S+ \[(?P<time_local>[^\]]+)\] "(?P<request>[^"]+)" (?P<status>\d{3}) (?P<body_bytes_sent>\S+) "(?P<http_referer>[^"]*)" "(?P<http_user_agent>[^"]*)"')
+      if !is_null(parsed) && !is_null(parsed.status) {
+        . = merge(., parsed)
+        .status = to_int!(.status)
+        if parsed.body_bytes_sent == "-" {
+          .body_bytes_sent = null
+        } else {
+          .body_bytes_sent = to_int(parsed.body_bytes_sent) ?? null
+        }
+      }
+
+# =====================  SINKS  =====================
 sinks:
-  axiom:
+  # Web/app logs ➜ web-logs (nginx + LiteSpeed + WP + WC + slow)
+  axiom-web-logs:
     type: axiom
+    token:  "${AXIOM_TOKEN}"
+    dataset: "web-logs"
     inputs:
-      - system_logs
-      - nginx_logs
-      - wp_debug
-    compression: zstd
-    dataset: "${AXIOM_DATASET}"
-    token: "${AXIOM_TOKEN}"
+      - parse_nginx_access_logs
+      - parse_litespeed_access_logs
+      - tag_nginx_error
+      - tag_litespeed_error
+      - tag_litespeed_php
+      - tag_litespeed_other
+      - tag_wp_debug
+      - tag_wc_logs
+      - tag_slow_logs
+
+  # 3: system logs ➜ server-logs
+  axiom-server-logs:
+    type: axiom
+    token:  "${AXIOM_TOKEN}"
+    dataset: "server-logs"
+    inputs: [tag_syslog]
+
+  # 2: host metrics ➜ server-stats (unchanged)
+  axiom-server-stats:
+    type: axiom
+    token:  "${AXIOM_TOKEN}"
+    dataset: "server-stats"
+    inputs: [tag_host_metrics]
