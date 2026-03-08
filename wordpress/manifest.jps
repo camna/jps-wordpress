@@ -91,12 +91,6 @@ settings:
       disabled: false
       tooltip: "WooCommerce is a free open-source e-commerce plugin designed specifically for WordPress. This is a great platform for a store of any size."
 
-    - caption: Axiom Dataset
-      type: textfield
-      name: axiom_dataset
-      required: false
-      tooltip: "Optional. Axiom dataset name used by Vector for log shipping."
-
     - caption: Axiom API Token
       type: textfield
       name: axiom_token
@@ -270,7 +264,6 @@ actions:
         NGINX_LOG_FORMAT_CONF="/etc/nginx/conf.d/log-format-sentree.conf"
         PHP_FPM_CONF="/etc/php-fpm.conf"
         VECTOR_CONFIG="/etc/vector/vector.yaml"
-        AXIOM_DATASET='${settings.axiom_dataset:}'
         AXIOM_TOKEN='${settings.axiom_token:}'
 
         log() {
@@ -323,8 +316,7 @@ actions:
         mkdir -p /etc/vector
         wget -q -O "$VECTOR_CONFIG" ${baseUrl}/vector.yaml
 
-        if [ -n "$AXIOM_DATASET" ] && [ -n "$AXIOM_TOKEN" ]; then
-          sed -i "s|\${AXIOM_DATASET}|$(escape_sed_replacement "$AXIOM_DATASET")|g" "$VECTOR_CONFIG"
+        if [ -n "$AXIOM_TOKEN" ]; then
           sed -i "s|\${AXIOM_TOKEN}|$(escape_sed_replacement "$AXIOM_TOKEN")|g" "$VECTOR_CONFIG"
           vector validate --no-environment "$VECTOR_CONFIG" &>> /var/log/run.log
           systemctl enable vector &>> /var/log/run.log

@@ -35,5 +35,4 @@ sinks:
       - nginx_logs
       - wp_debug
     compression: zstd
-    dataset: "${AXIOM_DATASET}"
     token: "${AXIOM_TOKEN}"
