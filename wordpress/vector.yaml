@@ -161,6 +161,7 @@ transforms:
       parsed = parse_regex!(.message, r'^(?P<remote_addr>\S+) \S+ \S+ \[(?P<time_local>[^\]]+)\] "(?P<request>[^"]+)" (?P<status>\d{3}) (?P<body_bytes_sent>\S+) "(?P<http_referer>[^"]*)" "(?P<http_user_agent>[^"]*)"')
       if !is_null(parsed) && !is_null(parsed.status) {
         . = merge(., parsed)
+        .timestamp = parse_timestamp!(.time_local, format: "%d/%b/%Y:%H:%M:%S %z") ?? .timestamp
         .status = to_int!(.status)
         if parsed.body_bytes_sent == "-" {
           .body_bytes_sent = null
@@ -177,6 +178,7 @@ transforms:
       parsed = parse_regex!(.message, r'^(?P<remote_addr>\S+) \S+ \S+ \[(?P<time_local>[^\]]+)\] "(?P<request>[^"]+)" (?P<status>\d{3}) (?P<body_bytes_sent>\S+) "(?P<http_referer>[^"]*)" "(?P<http_user_agent>[^"]*)"')
       if !is_null(parsed) && !is_null(parsed.status) {
         . = merge(., parsed)
+        .timestamp = parse_timestamp!(.time_local, format: "%d/%b/%Y:%H:%M:%S %z") ?? .timestamp
         .status = to_int!(.status)
         if parsed.body_bytes_sent == "-" {
           .body_bytes_sent = null
