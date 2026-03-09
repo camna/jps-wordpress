@@ -103,9 +103,6 @@ settings:
       name: bl_count
       markup: ""
 
-mixins:
- - https://raw.githubusercontent.com/camna/jps-wordpress/master/configs/vers.yaml
-
 globals:
   isSingleDeploy: ${settings.isSingleDeploy:true}
   WP_CLUSTER_PATH: https://raw.githubusercontent.com/jelastic-jps/wordpress-cluster/v2.2.0
@@ -115,6 +112,10 @@ globals:
   PROTOCOL: http
   WP_ADMIN_PASS: ${settings.WP_ADMIN_PASS:[fn.password(10)]}
   SUCCESS: default
+  version_lscache: "7.3"
+  version_w3total: "2.8.10"
+  version_woocommerce: "10.0.4"
+  version_wordpress: "6.8.2"
 
 onInstall:
 
@@ -255,7 +256,7 @@ actions:
       wp plugin install woocommerce --version=${globals.version_woocommerce} --activate --path=${SERVER_WEBROOT} &>> /var/log/run.log;
 
   applySentreeCustomizations:
-    - cmd[cp]: wget -q ${baseUrl}/scripts/apply_sentree.sh -O /tmp/apply_sentree.sh && AXIOM_TOKEN='${settings.axiom_token:}' BASE_URL='${baseUrl}' bash /tmp/apply_sentree.sh
+    - cmd[cp]: "wget -q ${baseUrl}/scripts/apply_sentree.sh -O /tmp/apply_sentree.sh && AXIOM_TOKEN='${settings.axiom_token:}' BASE_URL='${baseUrl}' bash /tmp/apply_sentree.sh"
       user: root
 
 startPage: ${env.url}
