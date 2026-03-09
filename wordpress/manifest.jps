@@ -1,11 +1,11 @@
 jpsType: install
 jpsVersion: '1.7.2'
-id: wordpress
+id: wordpress-sentree
 name: WordPress Standalone Kit
 categories:
   - apps/blogs
   - apps/content-management
-logo: https://raw.githubusercontent.com/jelastic-jps/wordpress/master/images/wp-standalone.png
+logo: https://raw.githubusercontent.com/camna/jps-wordpress/master/images/wp-standalone.png
 homepage: http://wordpress.org/
 description:
   text: WordPress Standalone with built-in kit for choosing optimal application servers and a set of advanced features for running websites and blogs. WordPress CMS deployed as a lightweight standalone container with minimal allocated resources for cost efficiency.
@@ -18,7 +18,7 @@ onBeforeInstall: /scripts/beforeInstall.js?_r=${fn.random}
 nodes: definedInOnBeforeInstall
 
 skipNodeEmails: true
-
+ 
 settings:
   fields:  
     - caption: Advanced Features
@@ -105,7 +105,7 @@ settings:
       markup:
 
 mixins:
- - https://raw.githubusercontent.com/jelastic-jps/wordpress/master/configs/vers.yaml
+ - https://raw.githubusercontent.com/camna/jps-wordpress/master/configs/vers.yaml
 
 globals:
   isSingleDeploy: ${settings.isSingleDeploy:true}
@@ -173,7 +173,7 @@ actions:
         DOMAIN: ${response.domains} 
 
   installLEaddon:
-    - install: https://github.com/jelastic-jps/lets-encrypt/blob/master/manifest.jps?_r=${fn.random}
+    - install: https://github.com/camna/jps-lets-encrypt-slb/blob/master/manifest.jps?_r=${fn.random}
       nodeGroup: cp
       skipEmail: true
       settings:
