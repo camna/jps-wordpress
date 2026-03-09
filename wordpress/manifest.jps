@@ -18,14 +18,14 @@ onBeforeInstall: /scripts/beforeInstall.js?_r=${fn.random}
 nodes: definedInOnBeforeInstall
 
 skipNodeEmails: true
- 
+
 settings:
   fields:  
     - caption: Advanced Features
       type: displayfield
       name: displayfield
-      markup:
- 
+      markup: ""
+
     - caption: Install LiteSpeed High-Performance Web Server
       type: checkbox
       name: ls-addon
@@ -94,15 +94,14 @@ settings:
     - caption: Axiom API Token
       type: textfield
       name: axiom_token
-      inputType: password
       required: false
       tooltip: "Optional. Axiom API token with ingest permissions for the selected dataset."
 
     - type: displayfield
       hideLabel: true
       hidden: true
-      name: bl_count   
-      markup:
+      name: bl_count
+      markup: ""
 
 mixins:
  - https://raw.githubusercontent.com/camna/jps-wordpress/master/configs/vers.yaml
