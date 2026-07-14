@@ -6,8 +6,14 @@ NGINX_SITE_CONF="${NGINX_SITE_CONF:-/etc/nginx/conf.d/sites-enabled/default.conf
 NGINX_LOG_FORMAT_CONF="${NGINX_LOG_FORMAT_CONF:-/etc/nginx/conf.d/log-format-sentree.conf}"
 PHP_FPM_CONF="${PHP_FPM_CONF:-/etc/php-fpm.conf}"
 VECTOR_CONFIG="${VECTOR_CONFIG:-/etc/vector/vector.yaml}"
-AXIOM_TOKEN="${AXIOM_TOKEN:-}"
+AXIOM_TOKEN_FILE="${AXIOM_TOKEN_FILE:-}"
+AXIOM_TOKEN=""
 BASE_URL="${BASE_URL:-}"
+
+if [ -n "$AXIOM_TOKEN_FILE" ] && [ -f "$AXIOM_TOKEN_FILE" ]; then
+  IFS= read -r AXIOM_TOKEN < "$AXIOM_TOKEN_FILE" || true
+  : > "$AXIOM_TOKEN_FILE"
+fi
 
 log() {
   echo "[sentree] $1" >> /var/log/run.log

@@ -20,7 +20,23 @@ nodes: definedInOnBeforeInstall
 skipNodeEmails: true
 
 settings:
-  fields:  
+  fields:
+    - caption: PHP version
+      type: list
+      name: php_engine
+      default: php8.5
+      required: true
+      width: 225
+      values:
+        - value: php8.5
+          caption: PHP 8.5
+        - value: php8.4
+          caption: PHP 8.4
+        - value: php8.3
+          caption: PHP 8.3
+        - value: php8.2
+          caption: PHP 8.2
+
     - caption: Advanced Features
       type: displayfield
       name: displayfield
@@ -103,9 +119,6 @@ settings:
       name: bl_count
       markup: ""
 
-mixins:
- - https://raw.githubusercontent.com/camna/jps-wordpress/master/configs/vers.yaml
-
 globals:
   isSingleDeploy: ${settings.isSingleDeploy:true}
   WP_CLUSTER_PATH: https://raw.githubusercontent.com/jelastic-jps/wordpress-cluster/v2.2.0
@@ -115,6 +128,7 @@ globals:
   PROTOCOL: http
   WP_ADMIN_PASS: ${settings.WP_ADMIN_PASS:[fn.password(10)]}
   SUCCESS: default
+  version_wordpress: "latest"
 
 onInstall:
 
@@ -221,7 +235,7 @@ actions:
     - install: ${globals.WP_CLUSTER_PATH}/addons/multisite.jps
 
   installWordpress:
-    - install: ${globals.WP_CLUSTER_PATH}/scripts/installWP.jps
+    - install: /scripts/installWP.jps
       settings:
         db_host: ${globals.DB_HOST}
         db_user: ${globals.DB_USER}
@@ -232,6 +246,8 @@ actions:
         wp_title: "Hello World"
         wp_url: ${globals.PROTOCOL}://${globals.DOMAIN}/
         cluster: false
+        version_wordpress: ${globals.version_wordpress}
+        targetNodeID: ${nodes.cp.master.id}
 
   setupNode:
     - log: OPTIMIZATION
@@ -252,10 +268,19 @@ actions:
       
   installWoocommerce:
     cmd[${nodes.cp.master.id}]: |-
-      wp plugin install woocommerce --version=${globals.version_woocommerce} --activate --path=${SERVER_WEBROOT} &>> /var/log/run.log;
+      wp plugin install woocommerce --activate --path=${SERVER_WEBROOT} &>> /var/log/run.log;
 
   applySentreeCustomizations:
-    - cmd[cp]: wget -q ${baseUrl}/scripts/apply_sentree.sh -O /tmp/apply_sentree.sh && AXIOM_TOKEN='${settings.axiom_token:}' BASE_URL='${baseUrl}' bash /tmp/apply_sentree.sh
+    - cmd[cp]: |-
+        umask 077
+        TOKEN_FILE=$(mktemp /tmp/axiom_token.XXXXXX)
+        cat > "$TOKEN_FILE" <<'AXIOM_TOKEN_EOF'
+        ${settings.axiom_token:}
+        AXIOM_TOKEN_EOF
+        chmod 600 "$TOKEN_FILE"
+        wget -q ${baseUrl}/scripts/apply_sentree.sh -O /tmp/apply_sentree.sh
+        AXIOM_TOKEN_FILE="$TOKEN_FILE" BASE_URL='${baseUrl}' bash /tmp/apply_sentree.sh
+        rm -f "$TOKEN_FILE"
       user: root
 
 startPage: ${env.url}
