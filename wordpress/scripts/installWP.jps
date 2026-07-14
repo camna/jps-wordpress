@@ -1,56 +1,102 @@
 jpsType: update
-name: WordPress Installation addon
-description: This package for WowrdPress configurations
+id: wordpress-core-installation
+name: WordPress Core Installation
+description: WordPress Core Installation
 
 globals:
-  WP_ADMIN_PASS: "${settings.wp_admin_pass}"
-  WP_TITLE: "${settings.wp_title}"
-  DB_HOST: "${settings.db_host}"
+  WP_ADMIN_PASS: ${settings.wp_admin_pass}
+  WP_TITLE: ${settings.wp_title}
+  DB_HOST: ${settings.db_host}
   DB_NAME: wp_${fn.random}
-  DB_USER: "${settings.db_user}"
-  DB_PASS: "${settings.db_pass}"
-  WP_URL: "${settings.wp_url}"
-  VERSION_WORDPRESS: "${settings.version_wordpress}"
-  TARGET_NODE_ID: "${settings.targetNodeID}"
+  DB_USER: ${settings.db_user}
+  DB_PASS: ${settings.db_pass}
+  REDIS_HOST: ${settings.redis_host:}
+  REDIS_PORT: ${settings.redis_port:}
+  REDIS_USER: ${settings.redis_user:}
+  REDIS_PSWD: ${settings.redis_pswd:}
+  WP_URL: ${settings.wp_url}
+  CLUSTER: ${settings.cluster:true}
+  VERSION_WORDPRESS: ${settings.version_wordpress:latest}
+  TARGET_NODE_ID: ${settings.targetNodeID}
 
 onInstall:
-  - installWP
+  - deployWordPress
   - installScripts
-  - setupWP
-  - if (/lemp/.test("${nodes.cp.nodeType}") || /nginxphp/.test("${nodes.cp.nodeType}")):
-    - nginxPurgeCache
+  - installWordPress
+  - setupWordPress
+  - installPlugins
+  - setupPlugins
 
 actions:
-  installWP:
+  deployWordPress:
     - cmd[${globals.TARGET_NODE_ID}]: |-
-        if [ "${globals.VERSION_WORDPRESS}" = "latest" ]; then WP_TARBALL='https://wordpress.org/latest.tar.gz'; else WP_TARBALL='https://wordpress.org/wordpress-${globals.VERSION_WORDPRESS}.tar.gz'; fi
-        wget -qO- "$WP_TARBALL" | tar xz -C /tmp && mv /tmp/wordpress/* ${SERVER_WEBROOT}
-        mysql -u${globals.DB_USER} -p${globals.DB_PASS} -h ${globals.DB_HOST} -e "CREATE DATABASE IF NOT EXISTS ${globals.DB_NAME};"
-        cd /var/www/webroot/ROOT && wp core config --dbhost=${globals.DB_HOST} --dbname=${globals.DB_NAME} --dbuser=${globals.DB_USER} --dbpass=${globals.DB_PASS} --path=${SERVER_WEBROOT}
-        cd /var/www/webroot/ROOT && wp core install --title="${globals.WP_TITLE}" --admin_user=${user.email} --admin_password=${globals.WP_ADMIN_PASS} --url=${globals.WP_URL} --admin_email=${user.email} --skip-email --path=${SERVER_WEBROOT}
-        wget ${baseUrl}../images/favicon.ico -O ${SERVER_WEBROOT}/favicon.ico
-        
+        if [ "${globals.VERSION_WORDPRESS}" = "latest" ] || [ -z "${globals.VERSION_WORDPRESS}" ]; then
+          WP_TARBALL='https://wordpress.org/latest.tar.gz'
+        else
+          WP_TARBALL='https://wordpress.org/wordpress-${globals.VERSION_WORDPRESS}.tar.gz'
+        fi
+        wget -qO /tmp/wordpress.tar.gz "$WP_TARBALL"
+        [ -d /tmp/wordpress/ ] && rm -rf /tmp/wordpress
+        tar -xzf /tmp/wordpress.tar.gz -C /tmp/
+        rsync -a /tmp/wordpress/* /var/www/webroot/ROOT/
+        rsync -a --checksum /tmp/wordpress/* /var/www/webroot/ROOT/
+    - addContext [cp]:
+        name: ROOT
+        fileName: WordPress
+        type: ARCHIVE
+
+  installWordPress:
+    - if ('${globals.CLUSTER}' == 'true'):
+        cmd[${globals.TARGET_NODE_ID}]: |-
+          mysql -u${globals.DB_USER} -p${globals.DB_PASS} -h ${nodes.sqldb.master.intIP} -e "CREATE DATABASE IF NOT EXISTS ${globals.DB_NAME};"
+          cd /var/www/webroot/ROOT && wp core config --dbhost=${nodes.sqldb.master.intIP} --dbname=${globals.DB_NAME} --dbuser=${globals.DB_USER} --dbpass=${globals.DB_PASS} --path=/var/www/webroot/ROOT
+          cd /var/www/webroot/ROOT && wp core install --title="${globals.WP_TITLE}" --admin_user=${user.email} --admin_password=${globals.WP_ADMIN_PASS} --url=${globals.WP_URL} --admin_email=${user.email} --skip-email --path=/var/www/webroot/ROOT
+          mv /var/www/webroot/ROOT/wp-config.php /tmp; sed -i "s/${nodes.sqldb.master.intIP}/${globals.DB_HOST}/g" /tmp/wp-config.php; mv /tmp/wp-config.php /var/www/webroot/ROOT
+          wget ${baseUrl}../images/favicon.ico -O /var/www/webroot/ROOT/favicon.ico
+      else:
+        cmd[${globals.TARGET_NODE_ID}]: |-
+          mysql -u${globals.DB_USER} -p${globals.DB_PASS} -h ${globals.DB_HOST} -e "CREATE DATABASE IF NOT EXISTS ${globals.DB_NAME};"
+          cd /var/www/webroot/ROOT && wp core config --dbhost=${globals.DB_HOST} --dbname=${globals.DB_NAME} --dbuser=${globals.DB_USER} --dbpass=${globals.DB_PASS} --path=/var/www/webroot/ROOT
+          cd /var/www/webroot/ROOT && wp core install --title="${globals.WP_TITLE}" --admin_user=${user.email} --admin_password=${globals.WP_ADMIN_PASS} --url=${globals.WP_URL} --admin_email=${user.email} --skip-email --path=/var/www/webroot/ROOT
+          wget ${baseUrl}../images/favicon.ico -O /var/www/webroot/ROOT/favicon.ico
+
   installScripts:
-    - cmd[${nodes.cp.master.id}]: |- 
+    - cmd[cp]: |-
         [ ! -d $HOME/bin ] && mkdir $HOME/bin
         curl -o $HOME/bin/wp https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar && chmod +x $HOME/bin/wp
+        echo "apache_modules:" > ~/bin/wp-cli.yml
+        echo "  - mod_rewrite" >> ~/bin/wp-cli.yml
         echo "export PATH=$PATH:$HOME/bin/" >> $HOME/.bash_profile
         wget ${baseUrl}/setupWP.sh?_r=${fn.random} -O ~/bin/setupWP.sh &>> /var/log/run.log
-        echo $HOME/bin;
-    - cmd[${nodes.cp.master.id}]:
-        echo ${response.out} >>  /etc/jelastic/redeploy.conf;
+        echo $HOME/bin
+    - cmd[cp]:
+        echo ${response.out} >> /etc/jelastic/redeploy.conf
+        yum install jq -y &>> /var/log/run.log
       user: root
-  
-  setupWP:
-    - cmd[${globals.TARGET_NODE_ID}]: |-
-        wget ${baseUrl}../scripts/setupWP.sh?_r=${fn.random} -O ~/bin/setupWP.sh &>> /var/log/run.log
-        bash ~/bin/setupWP.sh --pgcache true --objectcache true --REDIS_HOST /var/run/redis/redis.sock --REDIS_PORT 0
 
-  nginxPurgeCache:
+  setupWordPress:
     - cmd[${globals.TARGET_NODE_ID}]: |-
-        cd ${SERVER_WEBROOT};
-        wget ${baseUrl}../configs/wordpress/wp-jelastic.php -O ${SERVER_WEBROOT}/wp-jelastic.php
-        sed -i "s/.*'wp-settings.php';.*/require_once ABSPATH . 'wp-jelastic.php';\n&/" ${SERVER_WEBROOT}/wp-config.php
-        wp plugin install ${baseUrl}../scripts/nginx-fastcgi-cache-purge.zip --path=${SERVER_WEBROOT}
-        wp plugin activate nginx-fastcgi-cache-purge --path=${SERVER_WEBROOT}
-        wp option update permalink_structure '/%postname%' --path=${SERVER_WEBROOT}
+        grep -qE "(WP_AUTO_UPDATE_CORE)" /var/www/webroot/ROOT/wp-config.php || sed -i "/^\$table_prefix.*/a define( 'WP_AUTO_UPDATE_CORE', false );" /var/www/webroot/ROOT/wp-config.php
+        cd ~/bin/ && wp option update permalink_structure '/%postname%/' --path=/var/www/webroot/ROOT
+        cd ~/bin/ && wp rewrite structure '/%postname%/' --hard --path=/var/www/webroot/ROOT
+
+  installPlugins:
+    - if (/lemp/.test("${nodes.cp.nodeType}") || /nginxphp/.test("${nodes.cp.nodeType}")):
+        cmd[${globals.TARGET_NODE_ID}]: |-
+          wget ${baseUrl}../configs/wordpress/wp-jelastic.php -O /var/www/webroot/ROOT/wp-jelastic.php
+          mv /var/www/webroot/ROOT/wp-config.php /tmp; sed -i "s/.*'wp-settings.php';.*/require_once ABSPATH . 'wp-jelastic.php';\n&/" /tmp/wp-config.php; mv /tmp/wp-config.php /var/www/webroot/ROOT
+          wp plugin install w3-total-cache --activate --path=/var/www/webroot/ROOT &>> /var/log/run.log
+          wp cache flush --path=/var/www/webroot/ROOT &>> /var/log/run.log
+          wp plugin install nginx-cache --activate --path=/var/www/webroot/ROOT &>> /var/log/run.log
+          wp cache flush --path=/var/www/webroot/ROOT &>> /var/log/run.log
+          wp db query "INSERT INTO wp_options(option_name,option_value,autoload) VALUES('nginx_cache_path','/var/www/webroot/ROOT/.cache','yes');" --path=/var/www/webroot/ROOT &>> /var/log/run.log
+          wp db query "INSERT INTO wp_options(option_name,option_value,autoload) VALUES('nginx_auto_purge',1,'yes');" --path=/var/www/webroot/ROOT &>> /var/log/run.log
+          wp cache flush --path=/var/www/webroot/ROOT &>> /var/log/run.log
+    - if (/llsmp/.test("${nodes.cp.nodeType}") || /litespeed/.test("${nodes.cp.nodeType}")):
+        cmd[${globals.TARGET_NODE_ID}]: |-
+          wp plugin install litespeed-cache --activate --path=/var/www/webroot/ROOT &>> /var/log/run.log
+          wp cache flush --path=/var/www/webroot/ROOT &>> /var/log/run.log
+
+  setupPlugins:
+    - cmd[${globals.TARGET_NODE_ID}]: |-
+        bash ~/bin/setupWP.sh --pgcache true --objectcache true --REDIS_HOST ${globals.REDIS_HOST} --REDIS_PORT ${globals.REDIS_PORT} --REDIS_PASS ${globals.REDIS_PSWD}
