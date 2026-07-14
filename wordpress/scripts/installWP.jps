@@ -38,7 +38,6 @@ actions:
         wget -qO /tmp/wordpress.tar.gz "$WP_TARBALL"
         [ -d /tmp/wordpress/ ] && rm -rf /tmp/wordpress
         tar -xzf /tmp/wordpress.tar.gz -C /tmp/
-        rsync -a /tmp/wordpress/* /var/www/webroot/ROOT/
         rsync -a --checksum /tmp/wordpress/* /var/www/webroot/ROOT/
     - addContext [cp]:
         name: ROOT
@@ -48,14 +47,14 @@ actions:
   installWordPress:
     - if ('${globals.CLUSTER}' == 'true'):
         cmd[${globals.TARGET_NODE_ID}]: |-
-          mysql -u${globals.DB_USER} -p${globals.DB_PASS} -h ${nodes.sqldb.master.intIP} -e "CREATE DATABASE IF NOT EXISTS ${globals.DB_NAME};"
+          MYSQL_PWD='${globals.DB_PASS}' mysql -u${globals.DB_USER} -h ${nodes.sqldb.master.intIP} -e "CREATE DATABASE IF NOT EXISTS ${globals.DB_NAME};"
           cd /var/www/webroot/ROOT && wp core config --dbhost=${nodes.sqldb.master.intIP} --dbname=${globals.DB_NAME} --dbuser=${globals.DB_USER} --dbpass=${globals.DB_PASS} --path=/var/www/webroot/ROOT
           cd /var/www/webroot/ROOT && wp core install --title="${globals.WP_TITLE}" --admin_user=${user.email} --admin_password=${globals.WP_ADMIN_PASS} --url=${globals.WP_URL} --admin_email=${user.email} --skip-email --path=/var/www/webroot/ROOT
           mv /var/www/webroot/ROOT/wp-config.php /tmp; sed -i "s/${nodes.sqldb.master.intIP}/${globals.DB_HOST}/g" /tmp/wp-config.php; mv /tmp/wp-config.php /var/www/webroot/ROOT
           wget ${baseUrl}../images/favicon.ico -O /var/www/webroot/ROOT/favicon.ico
       else:
         cmd[${globals.TARGET_NODE_ID}]: |-
-          mysql -u${globals.DB_USER} -p${globals.DB_PASS} -h ${globals.DB_HOST} -e "CREATE DATABASE IF NOT EXISTS ${globals.DB_NAME};"
+          MYSQL_PWD='${globals.DB_PASS}' mysql -u${globals.DB_USER} -h ${globals.DB_HOST} -e "CREATE DATABASE IF NOT EXISTS ${globals.DB_NAME};"
           cd /var/www/webroot/ROOT && wp core config --dbhost=${globals.DB_HOST} --dbname=${globals.DB_NAME} --dbuser=${globals.DB_USER} --dbpass=${globals.DB_PASS} --path=/var/www/webroot/ROOT
           cd /var/www/webroot/ROOT && wp core install --title="${globals.WP_TITLE}" --admin_user=${user.email} --admin_password=${globals.WP_ADMIN_PASS} --url=${globals.WP_URL} --admin_email=${user.email} --skip-email --path=/var/www/webroot/ROOT
           wget ${baseUrl}../images/favicon.ico -O /var/www/webroot/ROOT/favicon.ico
@@ -69,7 +68,7 @@ actions:
         echo "export PATH=$PATH:$HOME/bin/" >> $HOME/.bash_profile
         wget ${baseUrl}/setupWP.sh?_r=${fn.random} -O ~/bin/setupWP.sh &>> /var/log/run.log
         echo $HOME/bin
-    - cmd[cp]:
+    - cmd[cp]: |-
         echo ${response.out} >> /etc/jelastic/redeploy.conf
         yum install jq -y &>> /var/log/run.log
       user: root
@@ -99,4 +98,4 @@ actions:
 
   setupPlugins:
     - cmd[${globals.TARGET_NODE_ID}]: |-
-        bash ~/bin/setupWP.sh --pgcache true --objectcache true --REDIS_HOST ${globals.REDIS_HOST} --REDIS_PORT ${globals.REDIS_PORT} --REDIS_PASS ${globals.REDIS_PSWD}
+        bash ~/bin/setupWP.sh --pgcache true --objectcache true --REDIS_HOST '${globals.REDIS_HOST}' --REDIS_PORT '${globals.REDIS_PORT}' --REDIS_PASS '${globals.REDIS_PSWD}'
