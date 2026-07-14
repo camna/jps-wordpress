@@ -20,7 +20,23 @@ nodes: definedInOnBeforeInstall
 skipNodeEmails: true
 
 settings:
-  fields:  
+  fields:
+    - caption: PHP version
+      type: list
+      name: php_engine
+      default: php8.5
+      required: true
+      width: 225
+      values:
+        - value: php8.5
+          caption: PHP 8.5
+        - value: php8.4
+          caption: PHP 8.4
+        - value: php8.3
+          caption: PHP 8.3
+        - value: php8.2
+          caption: PHP 8.2
+
     - caption: Advanced Features
       type: displayfield
       name: displayfield
@@ -115,7 +131,7 @@ globals:
   version_lscache: "7.3"
   version_w3total: "2.8.10"
   version_woocommerce: "10.0.4"
-  version_wordpress: "6.8.2"
+  version_wordpress: "latest"
 
 onInstall:
 
